@@ -1,5 +1,9 @@
 import express from "express";
 const bankRouter = express.Router();
+import {
+  validateDepositInput,
+  validateGetTxInput,
+} from "../middlewares/bank.middleware.js";
 
 import {
   handleDeposit,
@@ -7,8 +11,8 @@ import {
   handleWithdraw,
 } from "../controller/bank.controller.js";
 
-bankRouter.post("/deposit", handleDeposit);
+bankRouter.post("/deposit", validateDepositInput, handleDeposit);
 bankRouter.post("/withdraw", handleWithdraw);
-bankRouter.get("/tx", handleTxHistory);
+bankRouter.get("/tx", validateGetTxInput, handleTxHistory);
 
 export default bankRouter;
