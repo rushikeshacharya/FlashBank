@@ -8,9 +8,14 @@ const bankSchema = mongoose.Schema({
   balance: {
     type: Number,
     required: true,
+    default: 0,
   },
   txDetails: [
     {
+      txId: {
+        type: String,
+        required: true,
+      },
       txType: {
         type: String,
         required: true,
