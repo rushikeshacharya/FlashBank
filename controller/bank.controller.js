@@ -1,16 +1,11 @@
 import { UserSchema } from "../models/user.schema.js";
-import { deposit, getTxHistory } from "../services/bank.service.js";
-
-import { customAlphabet } from "nanoid";
-
-// Create a custom alphabet generator with digits only
-const generateRandomNumber = customAlphabet("0123456789", 10);
+import { deposit, getTxHistory, withdraw } from "../services/bank.service.js";
 
 const handleDeposit = async (req, res) => {
   try {
     console.log("in handle Deposit");
-    const amount = req.body.amount || null;
-    const accountNumber = req.body.accountNumber || null;
+    const amount = req.body.amount;
+    const accountNumber = req.body.accountNumber;
     const user = await UserSchema.findOne({
       accountNumber: accountNumber,
     });
@@ -26,15 +21,44 @@ const handleDeposit = async (req, res) => {
     throw new Error("Unable to deposit money");
   }
 };
-const handleWithdraw = (req, res) => {
+const handleWithdraw = async (req, res) => {
   console.log("in handle Withdraw");
-  return res.status(201).send("Withdrawn");
+  const amount = req.body.amount;
+  const accountNumber = req.body.accountNumber;
+  const user = await UserSchema.findOne({
+    accountNumber: accountNumber,
+  });
+  if (!user) return res.status(400).json({ error: "Account not Found" });
+  const result = await withdraw({
+    amount: amount,
+    accountNumber: accountNumber,
+  });
+  return res.status(201).send({ Withdrawn: result });
 };
 const handleTxHistory = async (req, res) => {
-  console.log("in handle Tx History");
-  const accountNumber = req?.body?.accountNumber || null;
-  await getTxHistory(accountNumber)
-  return res.status(200).send("Tx Details");
+  try {
+    console.log("in handle Tx History");
+    const accountNumber = req?.body?.accountNumber || null;
+    const result = await getTxHistory(accountNumber);
+    console.log("resjult", result);
+    const txDetails = {
+      accountNumber: result.accountNumber,
+      balance: result.balance,
+    };
+
+    txDetails["txHistory"] = result.txDetails.map((data) => {
+      return {
+        txId: data.txId,
+        txType: data.txType,
+        amount: data.amount,
+        previousBalance: data.previousBalance,
+        currentBalance: data.currentBalance,
+        timestamp: data.timestamp,
+      };
+    });
+
+    res.status(200).send(txDetails);
+  } catch (error) {}
 };
 
 export { handleDeposit, handleWithdraw, handleTxHistory };
