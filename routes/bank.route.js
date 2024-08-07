@@ -12,7 +12,7 @@ import {
 } from "../controller/bank.controller.js";
 
 bankRouter.post("/deposit", validateDepositInput, handleDeposit);
-bankRouter.post("/withdraw", handleWithdraw);
+bankRouter.post("/withdraw",validateDepositInput, handleWithdraw);
 bankRouter.get("/tx", validateGetTxInput, handleTxHistory);
 
 export default bankRouter;
