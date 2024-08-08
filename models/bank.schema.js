@@ -19,6 +19,7 @@ const bankSchema = mongoose.Schema({
       txType: {
         type: String,
         required: true,
+        enum: ['deposit', 'withdraw']
       },
       amount: {
         type: Number,
@@ -34,7 +35,7 @@ const bankSchema = mongoose.Schema({
       },
 
       timestamp: {
-        type: String,
+        type: Date,
         required: true,
       },
     },
