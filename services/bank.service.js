@@ -5,152 +5,145 @@ import { customAlphabet } from "nanoid";
 // Create a custom alphabet generator with digits only
 const generateRandomNumber = customAlphabet("0123456789", 10);
 
+// Deposit function
 const deposit = async (payload) => {
   try {
-    console.log("Payload", payload);
     const { amount, accountNumber } = payload;
+    const account = await BankSchema.findOne({ accountNumber });
 
-    const result = await BankSchema.findOne({ accountNumber });
-    console.log("result ", result);
-    const previousBalance = result?.balance || 0;
-    // if(!result)
-    const transaction = {
-      txId: generateRandomNumber(),
+    if (!account) {
+      throw new Error("Account not found");
+    }
+
+    const previousBalance = account.balance || 0;
+    const newBalance = previousBalance + amount;
+
+    const transaction = createTransaction({
       txType: "deposit",
       amount,
-      previousBalance, // This should be fetched from the existing document
-      currentBalance: previousBalance + amount, // This will be the new balance after addition
-      timestamp: new Date().toISOString(),
-    };
-    await DepositSchema.findOneAndUpdate(
-      { accountNumber },
-      {
-        $push: { txDetails: transaction },
-      },
-      { new: true, upsert: true }
-    );
+      previousBalance,
+      currentBalance: newBalance,
+    });
 
-    await BankSchema.findOneAndUpdate(
-      { accountNumber },
-      {
-        $inc: { balance: amount },
-        $push: { txDetails: transaction },
-      },
-      { new: true, upsert: true }
-    );
+    // Update both BankSchema and DepositSchema in parallel
+    await Promise.all([
+      DepositSchema.findOneAndUpdate(
+        { accountNumber },
+        { $push: { txDetails: transaction } },
+        { new: true, upsert: true }
+      ),
+      BankSchema.findOneAndUpdate(
+        { accountNumber },
+        { $inc: { balance: amount }, $push: { txDetails: transaction } },
+        { new: true, upsert: true }
+      ),
+    ]);
 
-    // return result;
+    return { status: "Success", newBalance };
   } catch (error) {
-    console.log("Error from Deposit", error);
-
+    console.error("Error during deposit:", error);
     throw new Error("Failed to deposit money");
   }
 };
 
+// Withdraw function
 const withdraw = async (payload) => {
   try {
-    console.log("Payload", payload);
     const { amount, accountNumber } = payload;
-
     const account = await BankSchema.findOne({ accountNumber });
-    const depositDetails = await DepositSchema.findOne({ accountNumber });
-    let availableWithrawalAmount = 0;
-    let currentTime = new Date();
 
-    if (!account || account?.balance < amount)
+    if (!account || account.balance < amount) {
       throw new Error("Insufficient Balance");
-
-
-    for (const transaction of depositDetails.txDetails) {
-      const timeDiffInMinutes =
-        (currentTime - transaction.timestamp) / (1000 * 60);
-        console.log("timeDiffInMinutes", timeDiffInMinutes);
-        
-
-      if (transaction.amount >= withdrawalAmount && timeDiffInMinutes >= (60*3)) {
-        const amountToWithdraw = Math.min(withdrawalAmount, transaction.amount);
-
-        transaction.amount -= amountToWithdraw;
-        availableWithrawalAmount += amountToWithdraw;
-
-        if (transaction.amount === 0) {
-          transaction.fullyWithdrawn = true;
-        }
-
-        withdrawalAmount -= amountToWithdraw;
-
-        if (withdrawalAmount === 0) {
-          break;
-        }
-      }
     }
 
-    if (availableWithrawalAmount < withdrawalAmount) {
-      console.log("Not enough funds available for withdrawal");
-    } else {
-      console.log("Withdrawal processed successfully");
+    const depositDetails = await DepositSchema.findOne({ accountNumber });
+
+    const { availableWithdrawalAmount, updatedTxDetails } =
+      calculateAvailableWithdrawal(depositDetails.txDetails, amount);
+
+    if (availableWithdrawalAmount < amount) {
+      throw new Error("Not enough funds available for withdrawal");
     }
-    // depositDetails.txDetails.forEach(element => {
-    //   console.log("Elemtn", element);
-    //   if(element.amount >= withdrawalAmount && (currentTime - element.timestamp)/(1000*60) >= 1 ){
-    //     element.amount -= withdrawalAmount;
-    //     availableWithrawalAmount += withdrawalAmount;
 
-    //     if(element.amount ===0 ){
-    //       element.fullyWithdrawn = true;
-    //     }
-    //   }
-    //   if(availableWithrawalAmount === withdrawalAmount){
-    //     return;
-    //   }
-    // });
+    const transaction = createTransaction({
+      txType: "withdraw",
+      amount,
+      previousBalance: account.balance,
+      currentBalance: account.balance - amount,
+    });
 
-    // await deposit.save();
+    // Update the transaction details in both schemas
+    await Promise.all([
+      DepositSchema.findOneAndUpdate(
+        { accountNumber },
+        { txDetails: updatedTxDetails },
+        { new: true }
+      ),
+      BankSchema.findOneAndUpdate(
+        { accountNumber },
+        { $inc: { balance: -amount }, $push: { txDetails: transaction } },
+        { new: true, upsert: true }
+      ),
+    ]);
 
-    // const transaction = {
-    //   txId: generateRandomNumber(),
-    //   txType: "withdraw",
-    //   amount,
-    //   previousBalance, // This should be fetched from the existing document
-    //   currentBalance: previousBalance - amount, // This will be the new balance after addition
-    //   timestamp: new Date(),
-    // };
-
-    // await BankSchema.findOneAndUpdate(
-    //   { accountNumber },
-    //   {
-    //     $inc: { balance: -amount },
-    //     $push: { txDetails: transaction },
-    //   },
-    //   { new: true, upsert: true }
-    // );
-    // const response = {
-    //   txId: transaction.txId,
-    //   balance: transaction.currentBalance,
-    // };
-    // console.log("Update result:", response);
-    // return response;
+    return { txId: transaction.txId, balance: transaction.currentBalance };
   } catch (error) {
-    console.log("Error ", error);
-    
-    throw new Error("Failed to Withdraw money");
+    console.error("Error during withdrawal:", error);
+    throw new Error("Failed to withdraw money");
   }
 };
 
+// Get transaction history function
 const getTxHistory = async (payload) => {
   try {
-    console.log("Payload", payload);
     const { accountNumber } = payload;
 
-    const result = await BankSchema.findOne(accountNumber);
+    const result = await BankSchema.findOne({ accountNumber }).lean();
 
-    if (!result) throw new Error("Unable to get tx History");
+    if (!result) {
+      throw new Error("Transaction history not found");
+    }
 
-    return result;
+    return result.txDetails;
   } catch (error) {
-    console.log("Error from Deposit", error);
-
-    throw new Error("Failed to deposit money");
+    console.error("Error fetching transaction history:", error);
+    throw new Error("Failed to retrieve transaction history");
   }
 };
+
+// Helper function to create transaction objects
+const createTransaction = ({
+  txType,
+  amount,
+  previousBalance,
+  currentBalance,
+}) => ({
+  txId: generateRandomNumber(),
+  txType,
+  amount,
+  previousBalance,
+  currentBalance,
+  timestamp: new Date().toISOString(),
+});
+
+// Helper function to calculate available withdrawal amount
+const calculateAvailableWithdrawal = (txDetails, withdrawalAmount) => {
+  let availableWithdrawalAmount = 0;
+  let updatedTxDetails = txDetails.map((transaction) => {
+    const timeDiffInMinutes =
+      (new Date() - new Date(transaction.timestamp)) / (1000 * 60);
+
+    if (transaction.amount > 0 && timeDiffInMinutes >= 1) {
+      const amountToWithdraw = Math.min(withdrawalAmount, transaction.amount);
+      transaction.amount -= amountToWithdraw;
+      availableWithdrawalAmount += amountToWithdraw;
+      withdrawalAmount -= amountToWithdraw;
+    }
+
+    return transaction;
+  });
+
+  return { availableWithdrawalAmount, updatedTxDetails };
+};
+
 export { deposit, getTxHistory, withdraw };
