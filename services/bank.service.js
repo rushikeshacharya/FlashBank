@@ -54,7 +54,6 @@ const withdraw = async (payload) => {
 
     const account = await BankSchema.findOne({ accountNumber });
     const depositDetails = await DepositSchema.findOne({ accountNumber });
-    let withdrawalAmount = amount;
     let availableWithrawalAmount = 0;
     let currentTime = new Date();
 
