@@ -1,5 +1,6 @@
+import { BankSchema } from "../models/bank.schema.js";
 import { UserSchema } from "../models/user.schema.js";
-import { deposit, getTxHistory, withdraw } from "../services/bank.service.js";
+import { deposit, getTxHistory, withdraw, getBalance } from "../services/bank.service.js";
 
 // Handle Deposit
 const handleDeposit = async (req, res) => {
@@ -83,4 +84,22 @@ const handleTxHistory = async (req, res) => {
   }
 };
 
-export { handleDeposit, handleWithdraw, handleTxHistory };
+// Handle Transaction History
+const handleGetBalance = async (req, res) => {
+  try {
+    const { accountNumber } = req.body;
+    // Fetch transaction history
+    console.log("Account Numbner", accountNumber);
+    
+    const result = await getBalance(accountNumber);
+
+    return res.status(200).json(result);
+  } catch (error) {
+    console.error("Error in handleTxHistory:", error);
+    return res
+      .status(500)
+      .json({ error: "Unable to fetch transaction history" });
+  }
+};
+
+export { handleDeposit, handleWithdraw, handleTxHistory, handleGetBalance };

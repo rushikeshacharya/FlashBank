@@ -7,6 +7,7 @@ import {
   handleDeposit,
   handleTxHistory,
   handleWithdraw,
+  handleGetBalance
 } from "../controller/bank.controller.js";
 
 const bankRouter = express.Router();
@@ -20,4 +21,5 @@ bankRouter.post("/withdraw", validateDepositInput, handleWithdraw);
 // Transaction History Route
 bankRouter.get("/tx", validateGetTxInput, handleTxHistory);
 
+bankRouter.get("/balance", validateGetTxInput, handleGetBalance);
 export default bankRouter;

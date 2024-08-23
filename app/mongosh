@@ -1,0 +1,12 @@
+db.banks.updateOne(
+  { accountNumber: "03916457142139" }, 
+  { $set: { balance: 100 } }       
+);
+
+db.deposits.updateOne(
+    {
+      accountNumber: "03916457142139",               
+      "txDetails._id": ObjectId("66c817688da460815ebf948b")  
+    },
+    { $set: { "txDetails.$.amount": 100 } }    // Update the `fullyWithdrawn` field
+  );

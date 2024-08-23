@@ -11,11 +11,11 @@ const deposit = async (payload) => {
     const { amount, accountNumber } = payload;
     const account = await BankSchema.findOne({ accountNumber });
 
-    if (!account) {
-      throw new Error("Account not found");
-    }
+    // if (!account) {
+    //   throw new Error("Account not found");
+    // }
 
-    const previousBalance = account.balance || 0;
+    const previousBalance = account?.balance || 0;
     const newBalance = previousBalance + amount;
 
     const transaction = createTransaction({
@@ -40,6 +40,20 @@ const deposit = async (payload) => {
     ]);
 
     return { status: "Success", newBalance };
+  } catch (error) {
+    console.error("Error during deposit:", error);
+    throw new Error("Failed to deposit money");
+  }
+};
+
+// Deposit function
+const getBalance = async (accountNumber) => {
+  try {
+    const account = await BankSchema.findOne({ accountNumber });
+    if (!account) {
+      throw new Error("Account not found");
+    }
+    return { status: "Success", balance: account.balance };
   } catch (error) {
     console.error("Error during deposit:", error);
     throw new Error("Failed to deposit money");
@@ -89,7 +103,7 @@ const withdraw = async (payload) => {
     return { txId: transaction.txId, balance: transaction.currentBalance };
   } catch (error) {
     console.error("Error during withdrawal:", error);
-    throw new Error("Failed to withdraw money");
+    throw new Error(error.message);
   }
 };
 
@@ -146,4 +160,4 @@ const calculateAvailableWithdrawal = (txDetails, withdrawalAmount) => {
   return { availableWithdrawalAmount, updatedTxDetails };
 };
 
-export { deposit, getTxHistory, withdraw };
+export { deposit, getTxHistory, withdraw, getBalance };
